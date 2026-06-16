@@ -230,6 +230,8 @@ func main() {
 		rebaseForce := rebaseCmd.Bool("force", false, "强制推送")
 		rebaseStash := rebaseCmd.Bool("stash", false, "是否 stash 未提交的变更")
 
+		needStashPop := true
+
 		rebaseCmd.Parse(os.Args[2:])
 		verbose = *rebaseVerbose
 
@@ -238,8 +240,13 @@ func main() {
 		}
 
 		if *rebaseStash {
-			if _, err := runCmd("git", "stash"); err != nil {
+			out, err := runCmd("git", "stash")
+			if err != nil {
 				log.Fatalf("git stash 失败：%v", err)
+			}
+
+			if strings.Contains(string(out), "No local changes to save") {
+				needStashPop = false
 			}
 		} else {
 			if _, err := runCmd("git", "add", "--all"); err != nil {
@@ -279,7 +286,7 @@ func main() {
 			}
 		}
 
-		if *rebaseStash {
+		if *rebaseStash && needStashPop {
 			if _, err := runCmd("git", "stash", "pop"); err != nil {
 				log.Fatalf("git stash pop 失败：%v", err)
 			}
