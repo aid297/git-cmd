@@ -9,9 +9,77 @@ import (
 	"strings"
 )
 
+func printUsage() {
+	fmt.Println(`git-cmd - Git 辅助命令行工具
+
+用法:
+  git-cmd <command> [options]
+
+可用命令:
+  push        一键提交并推送代码
+  merge       合并分支并推送
+  tag-last    查看最新标签
+  tag-push    创建并推送标签
+  help        显示帮助信息
+
+使用 git-cmd help <command> 查看具体命令的用法`)
+}
+
+func printPushHelp() {
+	fmt.Println(`push - 一键提交并推送代码
+
+用法:
+  git-cmd push --comment <提交信息> [--branch <分支名>]
+
+选项:
+  --comment   提交注释（必填）
+  --branch    推送到的远程分支名（可选，默认推送当前分支）
+
+示例:
+  git-cmd push --comment "修复bug"
+  git-cmd push --comment "新功能" --branch dev`)
+}
+
+func printMergeHelp() {
+	fmt.Println(`merge - 合并分支并推送
+
+用法:
+  git-cmd merge --branch <源分支> -> <目标分支>
+
+选项:
+  --branch   分支合并方向，格式: src -> dst（必填）
+
+示例:
+  git-cmd merge --branch "feature -> main"`)
+}
+
+func printTagPushHelp() {
+	fmt.Println(`tag-push - 创建并推送标签
+
+用法:
+  git-cmd tag-push --tag <标签名>
+
+选项:
+  --tag   标签名（必填）
+
+示例:
+  git-cmd tag-push --tag v1.0.0`)
+}
+
+func printTagLastHelp() {
+	fmt.Println(`tag-last - 查看最新标签
+
+用法:
+  git-cmd tag-last
+
+示例:
+  git-cmd tag-last`)
+}
+
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatalln("参数不足，至少需要一个子命令")
+		printUsage()
+		return
 	}
 
 	switch os.Args[1] {
@@ -108,7 +176,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("执行 git describe 失败：%s -> %v", out, err)
 		}
-		fmt.Println("最新标签:", string(out))
+		fmt.Println("最新标签:", strings.TrimSpace(string(out)))
 
 	case "tag-push":
 		tagCmd := flag.NewFlagSet("tag-push", flag.ExitOnError)
@@ -128,5 +196,28 @@ func main() {
 		if err != nil {
 			log.Fatalf("执行 git push 失败：%v", err)
 		}
+
+	case "help":
+		if len(os.Args) >= 3 {
+			switch os.Args[2] {
+			case "push":
+				printPushHelp()
+			case "merge":
+				printMergeHelp()
+			case "tag-push":
+				printTagPushHelp()
+			case "tag-last":
+				printTagLastHelp()
+			default:
+				fmt.Printf("未知命令: %s\n", os.Args[2])
+				printUsage()
+			}
+		} else {
+			printUsage()
+		}
+
+	default:
+		fmt.Printf("未知命令: %s\n", os.Args[1])
+		printUsage()
 	}
 }
