@@ -133,6 +133,22 @@ func runCmd(name string, args ...string) ([]byte, error) {
 	return out, err
 }
 
+// gitPull 执行 git pull 并处理冲突
+// pullArgs: git pull 的参数（如 "origin", "main"）
+// conflictHint: 遇到冲突时的解决提示
+func gitPull(pullArgs []string, conflictHint string) {
+	args := append([]string{"pull"}, pullArgs...)
+	out, err := runCmd("git", args...)
+	if err != nil {
+		if strings.Contains(string(out), "CONFLICT") {
+			fmt.Println("git pull 遇到冲突，请手动解决冲突后执行:")
+			fmt.Println(conflictHint)
+			os.Exit(1)
+		}
+		log.Fatalf("执行 git pull 失败：%v", err)
+	}
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
@@ -156,19 +172,23 @@ func main() {
 			log.Fatalf("执行 git add 失败：%v", err)
 		}
 
-		if _, err := runCmd("git", "commit", "-m", *pushComment); err != nil {
+		out, err := runCmd("git", "commit", "-m", *pushComment)
+		if err != nil {
+			// 没有变更时 git commit 返回非零退出码，但不应视为错误
+			if strings.Contains(string(out), "nothing to commit") {
+				fmt.Println("没有变更需要提交，跳过提交和推送")
+				return
+			}
 			log.Fatalf("执行 git commit 失败：%v", err)
 		}
 
-		if _, err := runCmd("git", "pull"); err != nil {
-			log.Fatalf("执行 git pull 失败：%v", err)
-		}
-
 		if *pushBranch != "" {
+			gitPull(nil, "  git add . && git commit && git push")
 			if _, err := runCmd("git", "push", "-u", "origin", *pushBranch); err != nil {
 				log.Fatalf("执行 git push 失败：%v", err)
 			}
 		} else {
+			gitPull([]string{"origin", *pushBranch}, "  git add . && git commit && git push")
 			if _, err := runCmd("git", "push"); err != nil {
 				log.Fatalf("执行 git push 失败：%v", err)
 			}
@@ -200,11 +220,16 @@ func main() {
 			log.Fatalf("执行 git fetch 失败：%v", err)
 		}
 
-		if _, err := runCmd("git", "pull", "origin", branchDst); err != nil {
-			log.Fatalf("执行 git pull 失败：%v", err)
-		}
+		gitPull([]string{"origin", branchDst}, fmt.Sprintf("  git add . && git commit && git push origin %s\n  git checkout %s", branchDst, branchSrc))
 
-		if _, err := runCmd("git", "merge", fmt.Sprintf("origin/%s", branchSrc)); err != nil {
+		out, err := runCmd("git", "merge", fmt.Sprintf("origin/%s", branchSrc))
+		if err != nil {
+			if strings.Contains(string(out), "CONFLICT") {
+				fmt.Printf("git merge 遇到冲突，请手动解决冲突后执行:\n")
+				fmt.Printf("  git add . && git commit && git push origin %s\n", branchDst)
+				fmt.Printf("  git checkout %s\n", branchSrc)
+				os.Exit(1)
+			}
 			log.Fatalf("执行 git merge 失败：%v", err)
 		}
 
