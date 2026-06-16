@@ -107,7 +107,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("执行 git checkout %s 失败：%v", branchSrc, err)
 		}
-	case "last-tag":
+	case "tag-last":
 		// cmd := exec.Command("git", "rev-list", "--tags", "--max-count=1")
 		// out, err := cmd.Output()
 		// if err != nil {
