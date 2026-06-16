@@ -22,6 +22,9 @@ func printUsage() {
   tag-push    创建并推送标签
   help        显示帮助信息
 
+全局选项:
+  -v          显示详细执行过程
+
 使用 git-cmd help <command> 查看具体命令的用法`)
 }
 
@@ -29,51 +32,89 @@ func printPushHelp() {
 	fmt.Println(`push - 一键提交并推送代码
 
 用法:
-  git-cmd push --comment <提交信息> [--branch <分支名>]
+  git-cmd push --comment <提交信息> [--branch <分支名>] [-v]
 
 选项:
   --comment   提交注释（必填）
   --branch    推送到的远程分支名（可选，默认推送当前分支）
+  -v          显示详细执行过程
 
 示例:
   git-cmd push --comment "修复bug"
-  git-cmd push --comment "新功能" --branch dev`)
+  git-cmd push --comment "新功能" --branch dev
+  git-cmd push --comment "优化" -v`)
 }
 
 func printMergeHelp() {
 	fmt.Println(`merge - 合并分支并推送
 
 用法:
-  git-cmd merge --branch <源分支> -> <目标分支>
+  git-cmd merge --branch <源分支> -> <目标分支> [-v]
 
 选项:
   --branch   分支合并方向，格式: src -> dst（必填）
+  -v         显示详细执行过程
 
 示例:
-  git-cmd merge --branch "feature -> main"`)
+  git-cmd merge --branch "feature -> main"
+  git-cmd merge --branch "feature -> main" -v`)
 }
 
 func printTagPushHelp() {
 	fmt.Println(`tag-push - 创建并推送标签
 
 用法:
-  git-cmd tag-push --tag <标签名>
+  git-cmd tag-push --tag <标签名> [-v]
 
 选项:
   --tag   标签名（必填）
+  -v      显示详细执行过程
 
 示例:
-  git-cmd tag-push --tag v1.0.0`)
+  git-cmd tag-push --tag v1.0.0
+  git-cmd tag-push --tag v1.0.0 -v`)
 }
 
 func printTagLastHelp() {
 	fmt.Println(`tag-last - 查看最新标签
 
 用法:
-  git-cmd tag-last
+  git-cmd tag-last [-v]
+
+选项:
+  -v   显示详细执行过程
 
 示例:
-  git-cmd tag-last`)
+  git-cmd tag-last
+  git-cmd tag-last -v`)
+}
+
+// verbose 控制是否显示详细执行过程
+var verbose bool
+
+// runCmd 封装命令执行，verbose 模式下打印执行的命令和输出
+func runCmd(name string, args ...string) ([]byte, error) {
+	cmdStr := name + " " + strings.Join(args, " ")
+	if verbose {
+		fmt.Printf("[执行] %s\n", cmdStr)
+	}
+
+	cmd := exec.Command(name, args...)
+	out, err := cmd.CombinedOutput()
+
+	if verbose {
+		output := strings.TrimSpace(string(out))
+		if output != "" {
+			fmt.Printf("[输出] %s\n", output)
+		}
+		if err != nil {
+			fmt.Printf("[错误] %v\n", err)
+		} else {
+			fmt.Println("[结果] 成功")
+		}
+	}
+
+	return out, err
 }
 
 func main() {
@@ -87,39 +128,32 @@ func main() {
 		pushCmd := flag.NewFlagSet("push", flag.ExitOnError)
 		pushBranch := pushCmd.String("branch", "", "分支")
 		pushComment := pushCmd.String("comment", "", "合并注释")
+		pushVerbose := pushCmd.Bool("v", false, "显示详细执行过程")
 		pushCmd.Parse(os.Args[2:])
-
-		err := exec.Command("git", "add", "--all").Run()
-		if err != nil {
-			log.Fatalf("执行 git add 失败：%v", err)
-		}
+		verbose = *pushVerbose
 
 		if *pushComment == "" {
 			log.Fatalln("提交注释不能为空")
 		}
-		err = exec.Command("git", "commit", "-m", *pushComment).Run()
-		if err != nil {
+
+		if _, err := runCmd("git", "add", "--all"); err != nil {
+			log.Fatalf("执行 git add 失败：%v", err)
+		}
+
+		if _, err := runCmd("git", "commit", "-m", *pushComment); err != nil {
 			log.Fatalf("执行 git commit 失败：%v", err)
 		}
 
-		if *pushBranch == "" {
-			err = exec.Command("git", "pull").Run()
-			if err != nil {
-				log.Fatalf("执行 git pull 失败：%v", err)
-			}
+		if _, err := runCmd("git", "pull"); err != nil {
+			log.Fatalf("执行 git pull 失败：%v", err)
+		}
 
-			err = exec.Command("git", "push").Run()
-			if err != nil {
+		if *pushBranch != "" {
+			if _, err := runCmd("git", "push", "-u", "origin", *pushBranch); err != nil {
 				log.Fatalf("执行 git push 失败：%v", err)
 			}
 		} else {
-			err = exec.Command("git", "pull").Run()
-			if err != nil {
-				log.Fatalf("执行 git pull 失败：%v", err)
-			}
-
-			err = exec.Command("git", "push", "-u", "origin", *pushBranch).Run()
-			if err != nil {
+			if _, err := runCmd("git", "push"); err != nil {
 				log.Fatalf("执行 git push 失败：%v", err)
 			}
 		}
@@ -127,7 +161,9 @@ func main() {
 	case "merge":
 		mergeCmd := flag.NewFlagSet("merge", flag.ExitOnError)
 		mergeBranch := mergeCmd.String("branch", "", "分支，格式: src -> dst")
+		mergeVerbose := mergeCmd.Bool("v", false, "显示详细执行过程")
 		mergeCmd.Parse(os.Args[2:])
+		verbose = *mergeVerbose
 
 		if *mergeBranch == "" {
 			log.Fatalln("分支不能为空")
@@ -140,60 +176,58 @@ func main() {
 		branchSrc := branchParts[0]
 		branchDst := branchParts[1]
 
-		err := exec.Command("git", "checkout", branchDst).Run()
-		if err != nil {
+		if _, err := runCmd("git", "checkout", branchDst); err != nil {
 			log.Fatalf("执行 git checkout %s 失败：%v", branchDst, err)
 		}
 
-		err = exec.Command("git", "fetch", "origin").Run()
-		if err != nil {
+		if _, err := runCmd("git", "fetch", "origin"); err != nil {
 			log.Fatalf("执行 git fetch 失败：%v", err)
 		}
 
-		err = exec.Command("git", "pull", "origin", branchDst).Run()
-		if err != nil {
+		if _, err := runCmd("git", "pull", "origin", branchDst); err != nil {
 			log.Fatalf("执行 git pull 失败：%v", err)
 		}
 
-		err = exec.Command("git", "merge", fmt.Sprintf("origin/%s", branchSrc)).Run()
-		if err != nil {
+		if _, err := runCmd("git", "merge", fmt.Sprintf("origin/%s", branchSrc)); err != nil {
 			log.Fatalf("执行 git merge 失败：%v", err)
 		}
 
-		err = exec.Command("git", "push", "origin", branchDst).Run()
-		if err != nil {
+		if _, err := runCmd("git", "push", "origin", branchDst); err != nil {
 			log.Fatalf("执行 git push origin %s 失败：%v", branchDst, err)
 		}
 
-		err = exec.Command("git", "checkout", branchSrc).Run()
-		if err != nil {
+		if _, err := runCmd("git", "checkout", branchSrc); err != nil {
 			log.Fatalf("执行 git checkout %s 失败：%v", branchSrc, err)
 		}
 
 	case "tag-last":
-		cmd := exec.Command("git", "describe", "--tags")
-		out, err := cmd.Output()
+		tagLastCmd := flag.NewFlagSet("tag-last", flag.ExitOnError)
+		tagLastVerbose := tagLastCmd.Bool("v", false, "显示详细执行过程")
+		tagLastCmd.Parse(os.Args[2:])
+		verbose = *tagLastVerbose
+
+		out, err := runCmd("git", "describe", "--tags")
 		if err != nil {
-			log.Fatalf("执行 git describe 失败：%s -> %v", out, err)
+			log.Fatalf("执行 git describe 失败：%v", err)
 		}
 		fmt.Println("最新标签:", strings.TrimSpace(string(out)))
 
 	case "tag-push":
 		tagCmd := flag.NewFlagSet("tag-push", flag.ExitOnError)
 		tagName := tagCmd.String("tag", "", "标签")
+		tagVerbose := tagCmd.Bool("v", false, "显示详细执行过程")
 		tagCmd.Parse(os.Args[2:])
+		verbose = *tagVerbose
 
 		if *tagName == "" {
 			log.Fatalln("标签不能为空")
 		}
 
-		err := exec.Command("git", "tag", *tagName).Run()
-		if err != nil {
+		if _, err := runCmd("git", "tag", *tagName); err != nil {
 			log.Fatalf("执行 git tag %s 失败：%v", *tagName, err)
 		}
 
-		err = exec.Command("git", "push", "origin", *tagName).Run()
-		if err != nil {
+		if _, err := runCmd("git", "push", "origin", *tagName); err != nil {
 			log.Fatalf("执行 git push 失败：%v", err)
 		}
 
