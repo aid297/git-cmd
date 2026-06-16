@@ -25,9 +25,10 @@ git-cmd help push
 ---
 ## 命令一览
 
-| 命令       | 说明             |
-| ---------- | ---------------- |
+| 命令       | 说明               |
+| ---------- | ------------------ |
 | `push`     | 一键提交并推送代码 |
+| `rebase`   | rebase             |
 | `merge`    | 合并分支并推送     |
 | `tag-list` | 查看标签列表       |
 | `tag-last` | 查看最新标签       |
@@ -37,6 +38,31 @@ git-cmd help push
 所有命令均支持 `-v` 参数，开启后会显示每一步执行的具体命令、输出和结果。
 
 ## 命令详解
+
+### rebase
+一键完成 `git add --all` → `git commit` → `git pull` → `git fetch origin` → `git rebase origin/目标分支` → `git push --force-with-lease` 。
+
+```bash
+git-cmd rebase --branch <目标分支> [--force | --force-with-lease] [-v]
+```
+
+| 参数                        | 说明             | 必填 |
+| --------------------------- | ---------------- | ---- |
+| --branch                    | 目标分支名称     | 是   |
+| --force\|--force-with-lease | 合并后推送参数   | 否   |
+| -v                          | 显示详细执行过程 | 否   |
+
+**示例：**
+
+---
+
+```bash
+git-cmd rebase --branch main
+git-cmd rebase --branch main --force
+git-cmd rebase --branch main --force-with-lease -v
+```
+
+---
 
 ### push
 

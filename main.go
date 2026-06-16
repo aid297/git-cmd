@@ -17,6 +17,7 @@ func printUsage() {
 
 可用命令:
   push        一键提交并推送代码
+  rebase      将当前分支 rebase 到目标分支
   merge       合并分支并推送
   tag-last    查看最新标签
   tag-push    创建并推送标签
@@ -103,6 +104,32 @@ func printTagLastHelp() {
 示例:
   git-cmd tag-last
   git-cmd tag-last -v`)
+}
+
+func printRebaseHelp() {
+	fmt.Println(`rebase - 将当前分支 rebase 到目标分支
+
+用法:
+  git-cmd rebase --branch <目标分支> [--force-with-lease | --force] [-v]
+
+选项:
+  --branch   要 rebase 的目标分支（必填）
+  --force-with-lease   强制推送 lease
+  --force              强制推送
+  -v         显示详细执行过程
+
+流程:
+  git fetch → git rebase origin/<目标分支> → git push --force-with-lease
+
+冲突处理:
+  遇到冲突时，手动解决后执行:
+    git add .
+    git rebase --continue
+    git push --force-with-lease
+
+示例:
+  git-cmd rebase --branch main
+  git-cmd rebase --branch main -v`)
 }
 
 // verbose 控制是否显示详细执行过程
@@ -193,6 +220,58 @@ func main() {
 				log.Fatalf("执行 git push 失败：%v", err)
 			}
 		}
+
+	case "rebase":
+		rebaseCmd := flag.NewFlagSet("rebase", flag.ExitOnError)
+		rebaseBranch := rebaseCmd.String("branch", "", "要 rebase 的目标分支")
+		rebaseVerbose := rebaseCmd.Bool("v", false, "显示详细执行过程")
+		rebaseForceWithLease := rebaseCmd.Bool("force-with-lease", false, "强制推送 lease")
+		rebaseForce := rebaseCmd.Bool("force", false, "强制推送")
+
+		rebaseCmd.Parse(os.Args[2:])
+		verbose = *rebaseVerbose
+
+		if *rebaseBranch == "" {
+			log.Fatalln("目标分支不能为空")
+		}
+
+		if _, err := runCmd("git", "add", "--all"); err != nil {
+			log.Fatalf("git add 失败：%v", err)
+		}
+
+		if _, err := runCmd("git", "commit", "-m", "rebase"); err != nil {
+			log.Fatalf("git commit 失败：%v", err)
+		}
+
+		// 先 fetch 获取远程最新状态
+		if _, err := runCmd("git", "fetch", "origin"); err != nil {
+			log.Fatalf("执行 git fetch 失败：%v", err)
+		}
+
+		// 执行 rebase
+		out, err := runCmd("git", "rebase", fmt.Sprintf("origin/%s", *rebaseBranch))
+		if err != nil {
+			if strings.Contains(string(out), "CONFLICT") {
+				fmt.Println("git rebase 遇到冲突，请手动解决冲突后执行:")
+				fmt.Println("  git add .")
+				fmt.Println("  git rebase --continue")
+				fmt.Println("  git push --force-with-lease")
+				os.Exit(1)
+			}
+			log.Fatalf("执行 git rebase 失败：%v", err)
+		}
+
+		if *rebaseForceWithLease {
+			if _, err := runCmd("git", "push", "--force-with-lease"); err != nil {
+				log.Fatalf("执行 git push 失败：%v", err)
+			}
+		} else if *rebaseForce {
+			if _, err := runCmd("git", "push", "--force"); err != nil {
+				log.Fatalf("执行 git push 失败：%v", err)
+			}
+		}
+
+		fmt.Println("rebase 完成并已推送")
 
 	case "merge":
 		mergeCmd := flag.NewFlagSet("merge", flag.ExitOnError)
@@ -298,6 +377,8 @@ func main() {
 			switch os.Args[2] {
 			case "push":
 				printPushHelp()
+			case "rebase":
+				printRebaseHelp()
 			case "merge":
 				printMergeHelp()
 			case "tag-push":
