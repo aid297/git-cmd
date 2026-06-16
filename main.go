@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-var (
-	branchSrc string
-	branchDst string
-	comment   *string
-	args      []string
-	branch    *string
-	tag       *string
-)
-
 func main() {
+	var (
+		branchSrc string
+		branchDst string
+		comment   *string
+		args      []string
+		branch    *string
+		tag       *string
+	)
+
 	branch = flag.String("branch", "", "分支")
 	tag = flag.String("tag", "", "标签")
 	comment = flag.String("comment", "", "合并注释")
@@ -25,7 +25,7 @@ func main() {
 	flag.Parse()
 	args = flag.Args()
 
-	if len(args) < 2 {
+	if len(args) < 1 {
 		log.Fatalln("参数不足，至少需要一个参数")
 	}
 
@@ -108,10 +108,16 @@ func main() {
 			log.Fatalf("执行 git checkout %s 失败：%v", branchSrc, err)
 		}
 	case "last-tag":
-		cmd := exec.Command("git", "describe", "--tags", "$(git rev-list --tags --max-count=1)")
+		// cmd := exec.Command("git", "rev-list", "--tags", "--max-count=1")
+		// out, err := cmd.Output()
+		// if err != nil {
+		// 	log.Fatalf("执行 git rev-list 失败：%s -> %v", out, err)
+		// }
+
+		cmd := exec.Command("git", "describe", "--tags")
 		out, err := cmd.Output()
 		if err != nil {
-			log.Fatalf("执行 git describe 失败：%v", err)
+			log.Fatalf("执行 git describe 失败：%s -> %v", out, err)
 		}
 		fmt.Println("最新标签:", string(out))
 	case "tag-push":

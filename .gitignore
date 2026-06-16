@@ -1,0 +1,9 @@
+.vscode
+.idea
+.cursor
+*.yaml
+storage
+.DS_Store
+storage/runtime
+*.exe
+__debug*
