@@ -110,10 +110,11 @@ func printRebaseHelp() {
 	fmt.Println(`rebase - 将当前分支 rebase 到目标分支
 
 用法:
-  git-cmd rebase --branch <目标分支> [--force-with-lease | --force] [-v]
+  git-cmd rebase --branch <目标分支> [stash] [--force-with-lease | --force] [-v]
 
 选项:
   --branch   要 rebase 的目标分支（必填）
+	--stash    是否 stash 未提交的变更（可选，默认使用 commit）
   --force-with-lease   强制推送 lease
   --force              强制推送
   -v         显示详细执行过程
@@ -227,6 +228,7 @@ func main() {
 		rebaseVerbose := rebaseCmd.Bool("v", false, "显示详细执行过程")
 		rebaseForceWithLease := rebaseCmd.Bool("force-with-lease", false, "强制推送 lease")
 		rebaseForce := rebaseCmd.Bool("force", false, "强制推送")
+		rebaseStash := rebaseCmd.Bool("stash", false, "是否 stash 未提交的变更")
 
 		rebaseCmd.Parse(os.Args[2:])
 		verbose = *rebaseVerbose
@@ -235,12 +237,18 @@ func main() {
 			log.Fatalln("目标分支不能为空")
 		}
 
-		if _, err := runCmd("git", "add", "--all"); err != nil {
-			log.Fatalf("git add 失败：%v", err)
-		}
+		if *rebaseStash {
+			if _, err := runCmd("git", "stash"); err != nil {
+				log.Fatalf("git stash 失败：%v", err)
+			}
+		} else {
+			if _, err := runCmd("git", "add", "--all"); err != nil {
+				log.Fatalf("git add 失败：%v", err)
+			}
 
-		if _, err := runCmd("git", "commit", "-m", "rebase"); err != nil {
-			log.Fatalf("git commit 失败：%v", err)
+			if _, err := runCmd("git", "commit", "-m", "rebase"); err != nil {
+				log.Fatalf("git commit 失败：%v", err)
+			}
 		}
 
 		// 先 fetch 获取远程最新状态
@@ -268,6 +276,12 @@ func main() {
 		} else if *rebaseForce {
 			if _, err := runCmd("git", "push", "--force"); err != nil {
 				log.Fatalf("执行 git push 失败：%v", err)
+			}
+		}
+
+		if *rebaseStash {
+			if _, err := runCmd("git", "stash", "pop"); err != nil {
+				log.Fatalf("git stash pop 失败：%v", err)
 			}
 		}
 
