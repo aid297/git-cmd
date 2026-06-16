@@ -75,6 +75,22 @@ func printTagPushHelp() {
   git-cmd tag-push --tag v1.0.0 -v`)
 }
 
+func printTagListHelp() {
+	fmt.Println(`tag-list - 查看标签列表
+
+用法:
+  git-cmd tag-list [--count <数量>] [-v]
+
+选项:
+  --count   显示标签数量（默认 1）
+  -v        显示详细执行过程
+
+示例:
+  git-cmd tag-list
+  git-cmd tag-list --count 3
+  git-cmd tag-list --count 5 -v`)
+}
+
 func printTagLastHelp() {
 	fmt.Println(`tag-last - 查看最新标签
 
@@ -200,6 +216,27 @@ func main() {
 			log.Fatalf("执行 git checkout %s 失败：%v", branchSrc, err)
 		}
 
+	case "tag-list":
+		tagListCmd := flag.NewFlagSet("tag-list", flag.ExitOnError)
+		tagListCount := tagListCmd.Int("count", 1, "显示标签数量")
+		tagListVerbose := tagListCmd.Bool("v", false, "显示详细执行过程")
+		tagListCmd.Parse(os.Args[2:])
+		verbose = *tagListVerbose
+
+		out, err := runCmd("git", "tag", "--sort=-v:refname")
+		if err != nil {
+			log.Fatalf("执行 git tag 失败：%v", err)
+		}
+		tags := strings.Split(strings.TrimSpace(string(out)), "\n")
+		// 取前 count 条（最新版本）
+		if len(tags) > *tagListCount {
+			tags = tags[:*tagListCount]
+		}
+		fmt.Printf("最近 %d 个标签:\n", *tagListCount)
+		for _, t := range tags {
+			fmt.Println(" ", t)
+		}
+
 	case "tag-last":
 		tagLastCmd := flag.NewFlagSet("tag-last", flag.ExitOnError)
 		tagLastVerbose := tagLastCmd.Bool("v", false, "显示详细执行过程")
@@ -240,6 +277,8 @@ func main() {
 				printMergeHelp()
 			case "tag-push":
 				printTagPushHelp()
+			case "tag-list":
+				printTagListHelp()
 			case "tag-last":
 				printTagLastHelp()
 			default:
