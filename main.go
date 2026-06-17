@@ -50,7 +50,7 @@ func printMergeHelp() {
 	fmt.Println(`merge - 合并分支并推送
 
 用法:
-  git-cmd merge --branch <源分支> -> <目标分支> [-v]
+  git-cmd merge --branch [<源分支>|不写默认当前分支合并] -> <目标分支> [-v]
 
 选项:
   --branch   分支合并方向，格式: src -> dst（必填）
@@ -110,7 +110,7 @@ func printRebaseHelp() {
 	fmt.Println(`rebase - 将当前分支 rebase 到目标分支
 
 用法:
-  git-cmd rebase --branch <目标分支> [stash] [--force-with-lease | --force] [-v]
+  git-cmd rebase --branch <目标分支> [--stash] [--force-with-lease | --force] [-v]
 
 选项:
   --branch   要 rebase 的目标分支（必填）
@@ -305,12 +305,25 @@ func main() {
 			log.Fatalln("分支不能为空")
 		}
 
+		var (
+			branchSrc, branchDst string
+		)
+
 		branchParts := strings.Split(*mergeBranch, " -> ")
-		if len(branchParts) != 2 {
-			log.Fatalln("分支格式错误，需要为 src -> dst")
+		switch len(branchParts) {
+		case 0:
+			log.Fatalln("分支不能为空")
+		case 1:
+			// 获取当前分支
+			out, err := runCmd("git", "branch", "--show-current")
+			if err != nil {
+				log.Fatalf("执行 git branch --show-current 失败：%v", err)
+			}
+			branchSrc = strings.TrimSpace(string(out))
+		case 2:
+			branchSrc = branchParts[0]
+			branchDst = branchParts[1]
 		}
-		branchSrc := branchParts[0]
-		branchDst := branchParts[1]
 
 		if _, err := runCmd("git", "checkout", branchDst); err != nil {
 			log.Fatalf("执行 git checkout %s 失败：%v", branchDst, err)
