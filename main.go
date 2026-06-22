@@ -110,12 +110,10 @@ func printRebaseHelp() {
 	fmt.Println(`rebase - 将当前分支 rebase 到目标分支
 
 用法:
-  git-cmd rebase --branch <目标分支> [--stash|commit] [--force-with-lease | --force] [-v]
+  git-cmd rebase --branch <目标分支> [--force-with-lease | --force] [-v]
 
 选项:
   --branch   要 rebase 的目标分支（必填）
-	--stash    是否 stash 未提交的变更
-	--commit   是否提交变更
   --force-with-lease   强制推送 lease
   --force              强制推送
   -v         显示详细执行过程

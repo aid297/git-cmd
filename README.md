@@ -40,18 +40,16 @@ git-cmd help push
 ## 命令详解
 
 ### rebase
-一键完成 **(**`git add --all` → `git commit`  **|** `git stash`**)** → `git pull` → `git fetch origin` → `git rebase origin/目标分支` → `git push --force-with-lease` → **[**`git stash pop`**]** 。
+一键完成 **(**`git stash`**)** → `git pull` → `git fetch origin` → `git rebase origin/目标分支` → `git push --force-with-lease` → **[**`git stash pop`**]** 。
 
 ---
 ```bash
-git-cmd rebase --branch <目标分支> [stash] [--force | --force-with-lease] [-v]
+git-cmd rebase --branch <目标分支> [--force | --force-with-lease] [-v]
 ```
 ---
-
 | 参数                        | 说明             | 必填 |
 | --------------------------- | ---------------- | ---- |
 | --branch                    | 目标分支名称     | 是   |
-| --stash                     | 使用 stash       | 否   |
 | --force\|--force-with-lease | 合并后推送参数   | 否   |
 | -v                          | 显示详细执行过程 | 否   |
 
@@ -65,7 +63,6 @@ git-cmd rebase --branch main --force
 git-cmd rebase --branch main --force-with-lease -v
 ```
 ---
-
 ### push
 
 一键完成 `git add --all` → `git commit` → `git pull` → `git push`。
