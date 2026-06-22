@@ -110,11 +110,12 @@ func printRebaseHelp() {
 	fmt.Println(`rebase - 将当前分支 rebase 到目标分支
 
 用法:
-  git-cmd rebase --branch <目标分支> [--stash] [--force-with-lease | --force] [-v]
+  git-cmd rebase --branch <目标分支> [--stash|commit] [--force-with-lease | --force] [-v]
 
 选项:
   --branch   要 rebase 的目标分支（必填）
-	--stash    是否 stash 未提交的变更（可选，默认使用 commit）
+	--stash    是否 stash 未提交的变更
+	--commit   是否提交变更
   --force-with-lease   强制推送 lease
   --force              强制推送
   -v         显示详细执行过程
@@ -228,7 +229,6 @@ func main() {
 		rebaseVerbose := rebaseCmd.Bool("v", false, "显示详细执行过程")
 		rebaseForceWithLease := rebaseCmd.Bool("force-with-lease", false, "强制推送 lease")
 		rebaseForce := rebaseCmd.Bool("force", false, "强制推送")
-		rebaseStash := rebaseCmd.Bool("stash", false, "是否 stash 未提交的变更")
 
 		needStashPop := true
 
@@ -239,23 +239,13 @@ func main() {
 			log.Fatalln("目标分支不能为空")
 		}
 
-		if *rebaseStash {
-			out, err := runCmd("git", "stash")
-			if err != nil {
-				log.Fatalf("git stash 失败：%v", err)
-			}
+		out, err := runCmd("git", "stash")
+		if err != nil {
+			log.Fatalf("git stash 失败：%v", err)
+		}
 
-			if strings.Contains(string(out), "No local changes to save") {
-				needStashPop = false
-			}
-		} else {
-			if _, err := runCmd("git", "add", "--all"); err != nil {
-				log.Fatalf("git add 失败：%v", err)
-			}
-
-			if _, err := runCmd("git", "commit", "-m", "rebase"); err != nil {
-				log.Fatalf("git commit 失败：%v", err)
-			}
+		if strings.Contains(string(out), "No local changes to save") {
+			needStashPop = false
 		}
 
 		// 先 fetch 获取远程最新状态
@@ -264,8 +254,7 @@ func main() {
 		}
 
 		// 执行 rebase
-		out, err := runCmd("git", "rebase", fmt.Sprintf("origin/%s", *rebaseBranch))
-		if err != nil {
+		if out, err = runCmd("git", "rebase", fmt.Sprintf("origin/%s", *rebaseBranch)); err != nil {
 			if strings.Contains(string(out), "CONFLICT") {
 				fmt.Println("git rebase 遇到冲突，请手动解决冲突后执行:")
 				fmt.Println("  git add .")
@@ -286,7 +275,7 @@ func main() {
 			}
 		}
 
-		if *rebaseStash && needStashPop {
+		if needStashPop {
 			if _, err := runCmd("git", "stash", "pop"); err != nil {
 				log.Fatalf("git stash pop 失败：%v", err)
 			}
@@ -305,25 +294,14 @@ func main() {
 			log.Fatalln("分支不能为空")
 		}
 
-		var (
-			branchSrc, branchDst string
-		)
+		var branchSrc, branchDst string
 
-		branchParts := strings.Split(*mergeBranch, " -> ")
-		switch len(branchParts) {
-		case 0:
-			log.Fatalln("分支不能为空")
-		case 1:
-			// 获取当前分支
-			out, err := runCmd("git", "branch", "--show-current")
-			if err != nil {
-				log.Fatalf("执行 git branch --show-current 失败：%v", err)
-			}
-			branchSrc = strings.TrimSpace(string(out))
-		case 2:
-			branchSrc = branchParts[0]
-			branchDst = branchParts[1]
+		if !strings.Contains(*mergeBranch, " -> ") {
+			log.Fatalln("分支格式错误，请使用 src -> dst")
 		}
+		branchParts := strings.Split(*mergeBranch, " -> ")
+		branchSrc = branchParts[0]
+		branchDst = branchParts[1]
 
 		if _, err := runCmd("git", "checkout", branchDst); err != nil {
 			log.Fatalf("执行 git checkout %s 失败：%v", branchDst, err)
