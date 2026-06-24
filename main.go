@@ -38,11 +38,13 @@ func printPushHelp() {
 选项:
   --comment   提交注释（必填）
   --branch    推送到的远程分支名（可选，默认推送当前分支）
+  --tag       创建并推送标签（可选）
   -v          显示详细执行过程
 
 示例:
   git-cmd push --comment "修复bug"
   git-cmd push --comment "新功能" --branch dev
+  git-cmd push --comment "优化" --tag v1.0.0
   git-cmd push --comment "优化" -v`)
 }
 
@@ -187,6 +189,7 @@ func main() {
 		pushCmd := flag.NewFlagSet("push", flag.ExitOnError)
 		pushBranch := pushCmd.String("branch", "", "分支")
 		pushComment := pushCmd.String("comment", "", "合并注释")
+		pushTag := pushCmd.String("tag", "", "标签")
 		pushVerbose := pushCmd.Bool("v", false, "显示详细执行过程")
 		pushCmd.Parse(os.Args[2:])
 		verbose = *pushVerbose
@@ -217,6 +220,15 @@ func main() {
 		} else {
 			gitPull([]string{"origin", *pushBranch}, "  git add . && git commit && git push")
 			if _, err := runCmd("git", "push"); err != nil {
+				log.Fatalf("执行 git push 失败：%v", err)
+			}
+		}
+
+		if *pushTag != "" {
+			if _, err := runCmd("git", "tag", *pushTag); err != nil {
+				log.Fatalf("执行 git tag 失败：%v", err)
+			}
+			if _, err := runCmd("git", "push", "origin", *pushTag); err != nil {
 				log.Fatalf("执行 git push 失败：%v", err)
 			}
 		}
