@@ -321,7 +321,7 @@ func main() {
 			log.Fatalf("执行 git fetch 失败：%v", err)
 		}
 
-		gitPull([]string{"origin", branchDst}, fmt.Sprintf("  git add . && git commit && git push origin %s\n  git checkout %s", branchDst, branchSrc))
+		gitPull([]string{"origin", branchDst}, fmt.Sprintf("  git add --all && git commit && git push origin %s\n  git checkout %s", branchDst, branchSrc))
 
 		out, err := runCmd("git", "merge", fmt.Sprintf("origin/%s", branchSrc))
 		if err != nil {
