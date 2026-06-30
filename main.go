@@ -112,10 +112,12 @@ func printRebaseHelp() {
 	fmt.Println(`rebase - 将当前分支 rebase 到目标分支
 
 用法:
-  git-cmd rebase --branch <目标分支> [--force-with-lease | --force] [-v]
+  git-cmd rebase --branch <目标分支> [--comment <提交注释>] [--stash] [--force-with-lease | --force] [-v]
 
 选项:
   --branch   要 rebase 的目标分支（必填）
+  --comment  合并时提交注释
+  --stash    是否 stash 变更
   --force-with-lease   强制推送 lease
   --force              强制推送
   -v         显示详细执行过程
@@ -234,11 +236,18 @@ func main() {
 		}
 
 	case "rebase":
+		var (
+			err error
+			out []byte
+		)
+
 		rebaseCmd := flag.NewFlagSet("rebase", flag.ExitOnError)
 		rebaseBranch := rebaseCmd.String("branch", "", "要 rebase 的目标分支")
 		rebaseVerbose := rebaseCmd.Bool("v", false, "显示详细执行过程")
 		rebaseForceWithLease := rebaseCmd.Bool("force-with-lease", false, "强制推送 lease")
 		rebaseForce := rebaseCmd.Bool("force", false, "强制推送")
+		rebaseStash := rebaseCmd.Bool("stash", false, "是否 stash 变更")
+		rebaseComment := rebaseCmd.String("comment", "", "合并时提交注释")
 
 		needStashPop := true
 
@@ -249,45 +258,90 @@ func main() {
 			log.Fatalln("目标分支不能为空")
 		}
 
-		out, err := runCmd("git", "stash")
-		if err != nil {
-			log.Fatalf("git stash 失败：%v", err)
-		}
-
-		if strings.Contains(string(out), "No local changes to save") {
-			needStashPop = false
-		}
-
-		// 先 fetch 获取远程最新状态
-		if _, err := runCmd("git", "fetch", "origin"); err != nil {
-			log.Fatalf("执行 git fetch 失败：%v", err)
-		}
-
-		// 执行 rebase
-		if out, err = runCmd("git", "rebase", fmt.Sprintf("origin/%s", *rebaseBranch)); err != nil {
-			if strings.Contains(string(out), "CONFLICT") {
-				fmt.Println("git rebase 遇到冲突，请手动解决冲突后执行:")
-				fmt.Println("  git add .")
-				fmt.Println("  git rebase --continue")
-				fmt.Println("  git push --force-with-lease")
-				os.Exit(1)
+		if *rebaseComment != "" {
+			if _, err := runCmd("git", "add", "--all"); err != nil {
+				log.Fatalf("执行 git add 失败：%v", err)
 			}
-			log.Fatalf("执行 git rebase 失败：%v", err)
-		}
 
-		if *rebaseForceWithLease {
-			if _, err := runCmd("git", "push", "--force-with-lease"); err != nil {
+			if _, err := runCmd("git", "commit", "-m", *rebaseComment); err != nil {
+				log.Fatalf("执行 git commit 失败：%v", err)
+			}
+
+			if _, err := runCmd("git", "push"); err != nil {
 				log.Fatalf("执行 git push 失败：%v", err)
 			}
-		} else if *rebaseForce {
-			if _, err := runCmd("git", "push", "--force"); err != nil {
-				log.Fatalf("执行 git push 失败：%v", err)
+
+			// 先 fetch 获取远程最新状态
+			if _, err := runCmd("git", "fetch", "origin"); err != nil {
+				log.Fatalf("执行 git fetch 失败：%v", err)
 			}
+
+			// 执行 rebase
+			if out, err = runCmd("git", "rebase", fmt.Sprintf("origin/%s", *rebaseBranch)); err != nil {
+				if strings.Contains(string(out), "CONFLICT") {
+					fmt.Println("git rebase 遇到冲突，请手动解决冲突后执行:")
+					fmt.Println("  git add .")
+					fmt.Println("  git rebase --continue")
+					fmt.Println("  git push --force-with-lease")
+					os.Exit(1)
+				}
+				log.Fatalf("执行 git rebase 失败：%v", err)
+			}
+
+			if *rebaseForceWithLease {
+				if _, err := runCmd("git", "push", "--force-with-lease"); err != nil {
+					log.Fatalf("执行 git push 失败：%v", err)
+				}
+			} else if *rebaseForce {
+				if _, err := runCmd("git", "push", "--force"); err != nil {
+					log.Fatalf("执行 git push 失败：%v", err)
+				}
+			}
+
+			return
 		}
 
-		if needStashPop {
-			if _, err := runCmd("git", "stash", "pop"); err != nil {
-				log.Fatalf("git stash pop 失败：%v", err)
+		if *rebaseStash {
+			out, err = runCmd("git", "stash")
+			if err != nil {
+				log.Fatalf("git stash 失败：%v", err)
+			}
+
+			if strings.Contains(string(out), "No local changes to save") {
+				needStashPop = false
+			}
+
+			// 先 fetch 获取远程最新状态
+			if _, err := runCmd("git", "fetch", "origin"); err != nil {
+				log.Fatalf("执行 git fetch 失败：%v", err)
+			}
+
+			// 执行 rebase
+			if out, err = runCmd("git", "rebase", fmt.Sprintf("origin/%s", *rebaseBranch)); err != nil {
+				if strings.Contains(string(out), "CONFLICT") {
+					fmt.Println("git rebase 遇到冲突，请手动解决冲突后执行:")
+					fmt.Println("  git add .")
+					fmt.Println("  git rebase --continue")
+					fmt.Println("  git push --force-with-lease")
+					os.Exit(1)
+				}
+				log.Fatalf("执行 git rebase 失败：%v", err)
+			}
+
+			if *rebaseForceWithLease {
+				if _, err := runCmd("git", "push", "--force-with-lease"); err != nil {
+					log.Fatalf("执行 git push 失败：%v", err)
+				}
+			} else if *rebaseForce {
+				if _, err := runCmd("git", "push", "--force"); err != nil {
+					log.Fatalf("执行 git push 失败：%v", err)
+				}
+			}
+
+			if needStashPop {
+				if _, err := runCmd("git", "stash", "pop"); err != nil {
+					log.Fatalf("git stash pop 失败：%v", err)
+				}
 			}
 		}
 
@@ -321,7 +375,11 @@ func main() {
 			log.Fatalf("执行 git fetch 失败：%v", err)
 		}
 
-		gitPull([]string{"origin", branchDst}, fmt.Sprintf("  git add --all && git commit && git push origin %s\n  git checkout %s", branchDst, branchSrc))
+		gitPull([]string{"origin", branchDst}, fmt.Sprintf(" git add --all && git commit && git push origin %s\n  git checkout %s", branchDst, branchSrc))
+
+		if _, err := runCmd("git", "fetch", "origin"); err != nil {
+			log.Fatalf("执行 git fetch 失败：%v", err)
+		}
 
 		out, err := runCmd("git", "merge", fmt.Sprintf("origin/%s", branchSrc))
 		if err != nil {
